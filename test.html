@@ -12,7 +12,6 @@ $(document).ready(function() {
 
     let opt = ""
     $('#form').find('input[name="opt"]').each(function(number, elem) {
-        jelem = $(elem)
         if (elem.checked) {
             opt = $(elem).val()
         }
@@ -22,14 +21,14 @@ $(document).ready(function() {
     if (opt === "fetch_parquet_zstd_7") {
         url = "/fetch_parquet?compression=zstd&compression_level=7"
     } else if (opt == "stream_ipc") {
-        url = "/stream_ipc"
+        url = "/stream_ipc?max_chunk_size_bytes=1048576"
     } else {
         console.log("Invalid option selected")
         return
     }
 
     $("#status").html("Loading " + url + " ...")
-    $.ajax({url: url, success: function(result) {
+    $.ajax({url: url, success: function(result, d) {
       let d2 = new Date()
       let end = d2.getTime()
       $("#status").html("Loaded in " + (end - start) + "ms")

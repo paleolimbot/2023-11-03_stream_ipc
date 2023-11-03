@@ -5,6 +5,7 @@ import geoarrow.pyarrow as ga
 import pyarrow.parquet as parquet
 import pyarrow.ipc as ipc
 import pyarrow.feather as feather
+import time
 
 
 app = Flask(__name__)
@@ -27,30 +28,49 @@ def fetch_parquet():
 
     tab = pa.table([geometry], names=["geometry"])
 
+    t0 = time.time()
     with io.BytesIO() as f:
-        parquet.ParquetWriter(f, tab.schema, compression=compression, compression_level=compression_level)
-        return bytes(f)
+        writer = parquet.ParquetWriter(
+            f, tab.schema, compression=compression, compression_level=compression_level
+        )
+        writer.write_table(tab)
+
+        t1 = time.time()
+        print(f"Wrote {len(f.getbuffer())} bytes in {t1 - t0} secs")
+
+        return app.response_class(
+            f.getvalue(), mimetype="application/vnd.apache.parquet"
+        )
+
 
 @app.route("/stream_ipc")
 def stream_ipc():
-    def generate():
-        max_chunk_size_bytes = request.args.get("max_chunk_size_bytes", None)
+    def generate(max_chunk_size_bytes):
+        t0 = time.time()
         chunked_geometry = geometry
         if max_chunk_size_bytes:
-            chunked_geometry = ga.rechunk(chunked_geometry, max_chunk_size_bytes)
+            chunked_geometry = ga.rechunk(chunked_geometry, int(max_chunk_size_bytes))
 
         schema = pa.schema([pa.field("geometry", chunked_geometry.type)])
 
         with io.BytesIO() as f, ipc.new_stream(f, schema) as stream:
-            yield f.getbuffer()
+            yield f.getvalue()
 
-            for chunk in geometry.chunks:
+            for chunk in chunked_geometry.chunks:
                 batch = pa.record_batch([chunk], names=["geometry"])
+                f.seek(0)
                 f.truncate(0)
                 stream.write_batch(batch)
-                yield f.getbuffer()
+                yield f.getvalue()
 
-    return app.response_class(generate(), mimetype='application/vnd.apache.arrow.stream')
+            t1 = time.time()
+            print(f"{len(geometry)} features served in {t1 - t0} secs")
 
-if __name__ == '__main__':
+    max_chunk_size_bytes = request.args.get("max_chunk_size_bytes", None)
+    return app.response_class(
+        generate(max_chunk_size_bytes), mimetype="application/vnd.apache.arrow.stream"
+    )
+
+
+if __name__ == "__main__":
     app.run(debug=True, port=5000)

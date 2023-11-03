@@ -5,26 +5,38 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script>
 $(document).ready(function() {
-  $("#go").click(function() {
-    let d = new Date();
-    let start = d.getTime();
 
-    let opt = $('#form').find('input[name="opt"]').val()
-    let url = "";
+  $("#go").click(function() {
+    let d = new Date()
+    let start = d.getTime()
+
+    let opt = ""
+    $('#form').find('input[name="opt"]').each(function(number, elem) {
+        jelem = $(elem)
+        if (elem.checked) {
+            opt = $(elem).val()
+        }
+    })
+
+    let url = ""
     if (opt === "fetch_parquet_zstd_7") {
         url = "/fetch_parquet?compression=zstd&compression_level=7"
     } else if (opt == "stream_ipc") {
         url = "/stream_ipc"
+    } else {
+        console.log("Invalid option selected")
+        return
     }
 
-    $("#status").html("Loading...")
+    $("#status").html("Loading " + url + " ...")
     $.ajax({url: url, success: function(result) {
-      let d2 = new Date();
-      let end = d2.getTime();
-      $("#status").html("Loaded in " + (end - start) + "ms");
-    }});
-  });
-});
+      let d2 = new Date()
+      let end = d2.getTime()
+      $("#status").html("Loaded in " + (end - start) + "ms")
+    }})
+  })
+})
+
 </script>
 </head>
 <body>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Stream Python to JS</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script>
+$(document).ready(function() {
+  $("#go").click(function() {
+    let d = new Date();
+    let start = d.getTime();
+
+    let opt = $('#form').find('input[name="opt"]').val()
+    let url = "";
+    if (opt === "fetch_parquet_zstd_7") {
+        url = "/fetch_parquet?compression=zstd&compression_level=7"
+    } else if (opt == "stream_ipc") {
+        url = "/stream_ipc"
+    }
+
+    $("#status").html("Loading...")
+    $.ajax({url: url, success: function(result) {
+      let d2 = new Date();
+      let end = d2.getTime();
+      $("#status").html("Loaded in " + (end - start) + "ms");
+    }});
+  });
+});
+</script>
+</head>
+<body>
+
+<div id="div1"><h2>Stream from Python to JS</h2></div>
+
+<form id="form">
+    <input type="radio" id="parquet_zstd_7_full" name="opt" value="fetch_parquet_zstd_7">
+    <label for="html">Fetch Parquet/ZSTD7</label><br>
+    <input type="radio" name="opt" value="stream_ipc">
+    <label for="css">Stream IPC</label><br>
+</form>
+
+<button id="go">Go</button>
+
+<div id="status"></div>
+
+</body>
+</html>

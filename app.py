@@ -6,6 +6,7 @@ import pyarrow.parquet as parquet
 import pyarrow.ipc as ipc
 import pyarrow.feather as feather
 import time
+import gzip
 
 
 app = Flask(__name__)
@@ -45,7 +46,7 @@ def fetch_parquet():
 
 @app.route("/stream_ipc")
 def stream_ipc():
-    def generate(max_chunk_size_bytes, options):
+    def generate(max_chunk_size_bytes, options, gzip_compress_level=0):
         t0 = time.time()
         chunked_geometry = geometry
         if max_chunk_size_bytes:
@@ -61,7 +62,10 @@ def stream_ipc():
                 f.seek(0)
                 f.truncate(0)
                 stream.write_batch(batch)
-                yield f.getvalue()
+                if gzip_compress_level:
+                    yield gzip.compress(f.getbuffer(), compresslevel=gzip_compress_level)
+                else:
+                    yield f.getvalue()
 
             t1 = time.time()
             print(f"{len(geometry)} features served in {t1 - t0} secs")
@@ -70,14 +74,25 @@ def stream_ipc():
     compression = request.args.get("compression", None)
     compression_level = request.args.get("compression_level", None)
 
-    if compression is not None and compression_level is not None:
-        compression = pa.Codec(compression, int(compression_level))
+    if compression != "gzip":
+        if compression is not None and compression_level is not None:
+            compression = pa.Codec(compression, int(compression_level))
 
-    options = ipc.IpcWriteOptions(compression=compression)
+        options = ipc.IpcWriteOptions(compression=compression)
+        gzip_compress_level = 0
+        headers = None
+    else:
+        if compression_level is None:
+            compression_level = 7
+
+        options = None
+        gzip_compress_level = int(compression_level)
+        headers = [("Content-Encoding", "gzip")]
 
     return app.response_class(
-        generate(max_chunk_size_bytes, options),
+        generate(max_chunk_size_bytes, options, gzip_compress_level),
         mimetype="application/vnd.apache.arrow.stream",
+        headers=headers
     )
 
 

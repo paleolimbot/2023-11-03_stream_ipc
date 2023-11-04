@@ -22,6 +22,8 @@ $(document).ready(function() {
         url = "/fetch_parquet?compression=zstd&compression_level=7"
     } else if (opt == "stream_ipc") {
         url = "/stream_ipc?max_chunk_size_bytes=1048576"
+    } else if (opt == "stream_ipc_zstd_7") {
+        url = "/stream_ipc?max_chunk_size_bytes=1048576&compression=zstd&compression_level=7"
     } else {
         console.log("Invalid option selected")
         return
@@ -47,6 +49,8 @@ $(document).ready(function() {
     <label for="html">Fetch Parquet/ZSTD7</label><br>
     <input type="radio" name="opt" value="stream_ipc">
     <label for="css">Stream IPC</label><br>
+    <input type="radio" name="opt" value="stream_ipc_zstd_7">
+    <label for="css">Stream IPC/ZSTD7</label><br>
 </form>
 
 <button id="go">Go</button>

@@ -45,7 +45,7 @@ def fetch_parquet():
 
 @app.route("/stream_ipc")
 def stream_ipc():
-    def generate(max_chunk_size_bytes):
+    def generate(max_chunk_size_bytes, options):
         t0 = time.time()
         chunked_geometry = geometry
         if max_chunk_size_bytes:
@@ -53,7 +53,7 @@ def stream_ipc():
 
         schema = pa.schema([pa.field("geometry", chunked_geometry.type)])
 
-        with io.BytesIO() as f, ipc.new_stream(f, schema) as stream:
+        with io.BytesIO() as f, ipc.new_stream(f, schema, options=options) as stream:
             yield f.getvalue()
 
             for chunk in chunked_geometry.chunks:
@@ -67,8 +67,17 @@ def stream_ipc():
             print(f"{len(geometry)} features served in {t1 - t0} secs")
 
     max_chunk_size_bytes = request.args.get("max_chunk_size_bytes", None)
+    compression = request.args.get("compression", None)
+    compression_level = request.args.get("compression_level", None)
+
+    if compression is not None and compression_level is not None:
+        compression = pa.Codec(compression, int(compression_level))
+
+    options = ipc.IpcWriteOptions(compression=compression)
+
     return app.response_class(
-        generate(max_chunk_size_bytes), mimetype="application/vnd.apache.arrow.stream"
+        generate(max_chunk_size_bytes, options),
+        mimetype="application/vnd.apache.arrow.stream",
     )
 
 

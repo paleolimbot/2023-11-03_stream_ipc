@@ -10,7 +10,14 @@ latency, transfer times, and transfer sizes as seen by the browser.
 ## TL;DR
 
 You should probably use an uncompressed IPC stream to send geometry from Python
-to JS.
+to JS if you are serving from localhost: this is a case where the time it takes
+to perform compression will dominate the time of the request. If you are serving
+over WiFi speeds and slower, transport time will dominate. In this case, the
+payoff of gzip compression is worth it as it results in the smallest transport
+sizes. If you have the ability to stream your result (i.e., perform transport
+and compression in parallel), gzip compression time
+is negligible. If you don't, using ZSTD buffer compression may be worth it as
+the compression time is ~2x faster.
 
 ## Fetch vs. Stream
 

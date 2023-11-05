@@ -11,7 +11,7 @@ import gzip
 
 app = Flask(__name__)
 
-geometry = feather.read_table("ns-water-water_line.arrow")["wkb_geometry"]
+geometry = feather.read_table("ns-water-water_line.arrow")["geometry"]
 
 
 @app.route("/")

@@ -47,7 +47,6 @@ def fetch_parquet():
 @app.route("/stream_ipc")
 def stream_ipc():
     def generate(max_chunk_size_bytes, options, gzip_compress_level=0):
-        t0 = time.time()
         chunked_geometry = geometry
         if max_chunk_size_bytes:
             chunked_geometry = ga.rechunk(chunked_geometry, int(max_chunk_size_bytes))
@@ -63,12 +62,11 @@ def stream_ipc():
                 f.truncate(0)
                 stream.write_batch(batch)
                 if gzip_compress_level:
-                    yield gzip.compress(f.getbuffer(), compresslevel=gzip_compress_level)
+                    yield gzip.compress(
+                        f.getbuffer(), compresslevel=gzip_compress_level
+                    )
                 else:
                     yield f.getvalue()
-
-            t1 = time.time()
-            print(f"{len(geometry)} features served in {t1 - t0} secs")
 
     max_chunk_size_bytes = request.args.get("max_chunk_size_bytes", None)
     compression = request.args.get("compression", None)
@@ -92,7 +90,63 @@ def stream_ipc():
     return app.response_class(
         generate(max_chunk_size_bytes, options, gzip_compress_level),
         mimetype="application/vnd.apache.arrow.stream",
-        headers=headers
+        headers=headers,
+    )
+
+
+@app.route("/stream_parquet")
+def stream_parquet():
+    def generate(
+        max_chunk_size_bytes, compression, compression_level, gzip_compress_level=0
+    ):
+        chunked_geometry = geometry
+        if max_chunk_size_bytes:
+            chunked_geometry = ga.rechunk(chunked_geometry, int(max_chunk_size_bytes))
+
+        with io.BytesIO() as f:
+            for chunk in chunked_geometry.chunks:
+                batch = pa.record_batch([chunk], names=["geometry"])
+                f.seek(0)
+                f.truncate(0)
+                with parquet.ParquetWriter(
+                    f,
+                    batch.schema,
+                    compression=compression,
+                    compression_level=compression_level,
+                ) as writer:
+                    writer.write_batch(batch)
+
+                if gzip_compress_level:
+                    yield gzip.compress(
+                        f.getbuffer(), compresslevel=gzip_compress_level
+                    )
+                else:
+                    yield f.getvalue()
+
+    max_chunk_size_bytes = request.args.get("max_chunk_size_bytes", None)
+    compression = request.args.get("compression", None)
+    compression_level = request.args.get("compression_level", None)
+
+    if compression != "gzip":
+        gzip_compress_level = 0
+        headers = None
+        if compression_level is not None:
+            compression_level = int(compression_level)
+    else:
+        if compression_level is None:
+            compression_level = 1
+
+        gzip_compress_level = int(compression_level)
+        compression = "NONE"
+        compression_level = None
+        headers = [("Content-Encoding", "gzip")]
+
+    return app.response_class(
+        generate(
+            max_chunk_size_bytes, compression, compression_level, gzip_compress_level
+        ),
+        mimetype="application/octet-stream",
+        headers=headers,
     )
 
 

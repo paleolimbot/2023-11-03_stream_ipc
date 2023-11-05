@@ -83,7 +83,7 @@ def stream_ipc():
         headers = None
     else:
         if compression_level is None:
-            compression_level = 7
+            compression_level = 1
 
         options = None
         gzip_compress_level = int(compression_level)

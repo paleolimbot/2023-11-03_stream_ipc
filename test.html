@@ -12,31 +12,49 @@ $(document).ready(function() {
 
     let opt = ""
     $('#form').find('input[name="opt"]').each(function(number, elem) {
-        if (elem.checked) {
-            opt = $(elem).val()
-        }
+      if (elem.checked) {
+        opt = $(elem).val()
+      }
     })
 
     let url = ""
     if (opt === "fetch_parquet_zstd_7") {
-        url = "/fetch_parquet?compression=zstd&compression_level=7"
+      url = "/fetch_parquet?compression=zstd&compression_level=7"
     } else if (opt == "stream_ipc") {
-        url = "/stream_ipc?max_chunk_size_bytes=1048576"
+      url = "/stream_ipc?max_chunk_size_bytes=1048576"
     } else if (opt == "stream_ipc_zstd_7") {
-        url = "/stream_ipc?max_chunk_size_bytes=1048576&compression=zstd&compression_level=7"
+      url = "/stream_ipc?max_chunk_size_bytes=1048576&compression=zstd&compression_level=7"
     } else if (opt == "stream_ipc_gzip") {
-        url = "/stream_ipc?max_chunk_size_bytes=1048576&compression=gzip&compression_level=1"
+      url = "/stream_ipc?max_chunk_size_bytes=1048576&compression=gzip&compression_level=1"
     } else {
-        console.log("Invalid option selected")
-        return
+      console.log("Invalid option selected")
+      return
     }
 
     $("#status").html("Loading " + url + " ...")
-    $.ajax({url: url, success: function(result, d) {
-      let d2 = new Date()
-      let end = d2.getTime()
-      $("#status").html("Loaded in " + (end - start) + "ms")
-    }})
+
+    // Load in a way that doesn't buffer the whole response in memory
+    // since that process takes the majority of the time if we let it happen
+    // for all responses
+    const consume = responseReader => {
+      return responseReader.read().then(result => {
+          if (result.done) {
+            let d2 = new Date()
+            let end = d2.getTime()
+            $("#status").html("Loaded in " + (end - start) + "ms")
+            return
+          }
+
+          // do something with the chunk
+
+          return consume(responseReader)
+        })
+      }
+
+      // Perform the request and consume response stream
+      fetch(url).then(response => {
+        return consume(response.body.getReader())
+      }).catch(console.log.bind(console))
   })
 })
 

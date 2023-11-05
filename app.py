@@ -5,7 +5,6 @@ import geoarrow.pyarrow as ga
 import pyarrow.parquet as parquet
 import pyarrow.ipc as ipc
 import pyarrow.feather as feather
-import time
 import gzip
 
 
@@ -18,30 +17,6 @@ geometry = feather.read_table("ns-water-water_line.arrow")["geometry"]
 def index():
     with open("test.html") as f:
         return f.read()
-
-
-@app.route("/fetch_parquet")
-def fetch_parquet():
-    compression = request.args.get("compression", "NONE")
-    compression_level = request.args.get("compression_level", None)
-    if compression_level is not None:
-        compression_level = int(compression_level)
-
-    tab = pa.table([geometry], names=["geometry"])
-
-    t0 = time.time()
-    with io.BytesIO() as f:
-        writer = parquet.ParquetWriter(
-            f, tab.schema, compression=compression, compression_level=compression_level
-        )
-        writer.write_table(tab)
-
-        t1 = time.time()
-        print(f"Wrote {len(f.getbuffer())} bytes in {t1 - t0} secs")
-
-        return app.response_class(
-            f.getvalue(), mimetype="application/vnd.apache.parquet"
-        )
 
 
 @app.route("/stream_ipc")
@@ -87,8 +62,12 @@ def stream_ipc():
         gzip_compress_level = int(compression_level)
         headers = [("Content-Encoding", "gzip")]
 
+    result = generate(max_chunk_size_bytes, options, gzip_compress_level)
+    if request.args.get("fetch", "false") == "true":
+        result = list(result)
+
     return app.response_class(
-        generate(max_chunk_size_bytes, options, gzip_compress_level),
+        result,
         mimetype="application/vnd.apache.arrow.stream",
         headers=headers,
     )
@@ -141,10 +120,14 @@ def stream_parquet():
         compression_level = None
         headers = [("Content-Encoding", "gzip")]
 
+    result = generate(
+        max_chunk_size_bytes, compression, compression_level, gzip_compress_level
+    )
+    if request.args.get("fetch", "false") == "true":
+        result = list(result)
+
     return app.response_class(
-        generate(
-            max_chunk_size_bytes, compression, compression_level, gzip_compress_level
-        ),
+        result,
         mimetype="application/octet-stream",
         headers=headers,
     )
